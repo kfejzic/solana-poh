@@ -1,7 +1,7 @@
 const Hash = @import("hash.zig").Hash;
 const std = @import("std");
 
-const LOW_POWER_MODE: u64 = 300;
+const LOW_POWER_MODE: u64 = std.math.maxInt(u64);
 
 /// This struct is a representation of the state of the PoH generator at any
 /// given time.
@@ -46,7 +46,6 @@ pub const Poh = struct {
     pub fn hash_sha256(self: *Poh, max_num_hashes: u64) bool {
         // Ensuring that the provided(wanted) number of hashes doesn't exceed the
         // remaining number of hashes.
-        // const num_hashes = std.math.min(self.remaining_hashes - 1, max_num_hashes);
         const num_hashes = @min(self.remaining_hashes - 1, max_num_hashes);
 
         for (0..num_hashes) |_| {
