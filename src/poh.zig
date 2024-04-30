@@ -3,6 +3,19 @@ const std = @import("std");
 
 const LOW_POWER_MODE: u64 = std.math.maxInt(u64);
 
+/// This struct is a representation of a single entry in the PoH record. Each
+/// one of them serving as a verif. timestamp, linking events to keep the order.
+pub const PohEntry = struct {
+    /// This field showcases the number of hashes that were computed to create
+    /// this particular PohEntry, since the last entry, helping to understand the
+    /// time that elapsed between 2 entries.
+    num_hashes: u64,
+    /// This field showcases the hash value for this particular entry,
+    /// computated based on the previous PohEntry-hash as input, combined with
+    /// additional data.
+    hash: Hash,
+};
+
 /// This struct is a representation of the state of the PoH generator at any
 /// given time.
 pub const Poh = struct {
@@ -51,7 +64,7 @@ pub const Poh = struct {
         for (0..num_hashes) |_| {
             // Perform the SHA256 hash on its current hash value (Current value
             // being the input), creating a chain/sequence.
-            self.hash.hash();
+            self.hash.hash(null);
         }
 
         // Updating the fields to reflect the current(new) state
@@ -64,5 +77,47 @@ pub const Poh = struct {
         // Returning true if case the remaining hashes comes to 1, requiring a
         // tick()
         return self.remaining_hashes == 1;
+    }
+
+    /// This function records an event by taking a piece of data(event) 'mixin', and
+    /// incorporating it into the ongoiong PoH sequence/chain, This ensures that
+    /// every event is linked to the history of all previous entries.
+    pub fn record(self: *Poh, mixin: Hash) ?PohEntry {
+        // Ensuring that we are not in the 'tick ready' state.
+        if (self.remaining_hashes == 1) return null;
+
+        // Performing a hash by hashing current poh combined with mixin.
+        self.hash.hash(&mixin);
+        const num_hashes = self.num_hashes + 1;
+        // Reseting the num_hashes since a record is created, but leaving the
+        // remaining_hashes in tact (just decrement) to ensure tick happens as regular.
+        self.num_hashes = 0;
+        self.remaining_hashes -= 1;
+
+        return PohEntry{ .num_hashes = num_hashes, .hash = self.hash };
+    }
+
+    /// This function generates a new PohEntry that represents a tick in the poh
+    /// sequence, when no external data are incorporated, used for timekeeping.
+    pub fn tick(self: *Poh) ?PohEntry {
+        // Perform the final hash of the poh sequence and update the Poh state
+        // to reflect that
+        self.hash.hash(null);
+        self.num_hashes += 1;
+        self.remaining_hashes -= 1;
+
+        // Checking if we are in low power mode and the state of our remaining
+        // hashes is 0, since a record is created if we're in LPM, or there are
+        // no remaining hashes left.
+        if (self.hashes_per_tick != LOW_POWER_MODE and self.remaining_hashes != 0)
+            return null;
+
+        // Save the current state (snapshot) of the Poh for record purposes.
+        const num_hashes = self.num_hashes;
+        // Reset remaining_hashes to the initial value for a new tick flow.
+        self.remaining_hashes = self.hashes_per_tick;
+        self.tick_number += 1;
+
+        return PohEntry{ .num_hashes = num_hashes, .hash = self.hash };
     }
 };

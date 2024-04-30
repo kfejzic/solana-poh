@@ -4,7 +4,8 @@ const crypto = std.crypto;
 /// Public constant defining the hash size (data array size for hash storage).
 pub const HASH_SIZE: usize = 32;
 
-///
+/// This struct encapsulates the hash data array providing more
+/// options/manipulation and flexibility over the actual hash.
 pub const Hash = struct {
     /// An array to store SHA256 hashed output.
     data: [HASH_SIZE]u8,
@@ -15,13 +16,19 @@ pub const Hash = struct {
     }
 
     /// Hashing function that takes it's own state (data) and performs a SHA256
-    /// hashing alg on it. NOTE: It's planned to have an optional field that will
-    /// serve as additional data to hash (if SOME, hasher.update(that_data)....
-    pub fn hash(self: *Hash) void {
+    /// hashing alg on it. Additionally, if mixin is provided, we hash the both
+    /// self data and mixin data.
+    pub fn hash(self: *Hash, mixin: ?*const Hash) void {
         // SHA256 Hasher initialization
         var hasher = crypto.hash.sha2.Sha256.init(.{});
         // Updating the hasher with data(to hash)
         hasher.update(&self.data);
+
+        // Checking if mixin is provided, then adding it to the hasher to hash.
+        // If not provided we are only hashing self.data
+        if (mixin) |val| {
+            hasher.update(&val.data);
+        }
 
         // Getting the hashed data and updating the Hash state with it.
         self.data = hasher.finalResult();

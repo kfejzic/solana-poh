@@ -8,12 +8,14 @@ pub fn main() !void {
 
     var poh = Poh.new(Hash.new(), 10, null);
     std.debug.print("Hash before: {}\n", .{poh.hash});
-    _ = poh.hash_sha256(10);
+    _ = poh.hash_sha256(8);
     std.debug.print("Hash after: {}\n", .{poh.hash});
 
-    // var hash = Hash.default();
-    // for (0..10) |_| {
-    //     hash.hash();
-    //     std.debug.print("{}!\n", .{hash});
-    // }
+    if (poh.record(poh.hash)) |rec| {
+        std.debug.print("record(): Record.num_hashes: {}, Record.hash: {}\n", .{ rec.num_hashes, rec.hash });
+    }
+
+    if (poh.tick()) |rec| {
+        std.debug.print("tick(): Record.num_hashes: {}, Record.hash: {}\n", .{ rec.num_hashes, rec.hash });
+    }
 }
