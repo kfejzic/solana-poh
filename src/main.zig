@@ -15,11 +15,16 @@ pub fn main() !void {
     var transactionsRecorder = TransactionRecorder.new(&channel);
 
     var poh_recorder = PohRecorder.new(Hash.new(), 400000, 100);
-    var poh_service = PohService.new(&exit, poh_recorder.get_poh_guarded_reference(), 1000, 400000, &channel, &poh_recorder);
+    var poh_service = PohService.new(&exit, poh_recorder.get_poh_guarded_reference(), 10, 400000, &channel, &poh_recorder);
     poh_service.start();
 
     for (0..10) |i| {
-        const tx = std.ArrayList(u64).init(std.heap.page_allocator);
+        var tx = std.ArrayList(u64).init(std.heap.page_allocator);
+
+        for (0..4) |t| {
+            tx.append(t) catch return;
+        }
+
         const sent = transactionsRecorder.record_transaction(i, tx);
 
         std.debug.print("Record is sent? -> {}!\n", .{sent});
