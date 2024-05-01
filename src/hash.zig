@@ -40,8 +40,8 @@ pub const Hash = struct {
 pub fn hash_transactions(transactions: std.ArrayList(u64)) Hash {
     var hasher = crypto.hash.sha2.Sha256.init(.{});
     for (transactions.items) |item| {
-        const bytes = std.mem.toBytes(u64, item);
-        hasher.update(bytes);
+        const bytes = std.mem.toBytes(item);
+        hasher.update(&bytes);
     }
 
     return Hash{ .data = hasher.finalResult() };

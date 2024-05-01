@@ -17,20 +17,23 @@ pub const Channel = struct {
     queue: std.ArrayList(Record),
 
     /// Constructs a new Channel with an allocator provided.
-    pub fn new(allocator: std.mem.Allocator) Channel {
-        return Channel{ .locked = std.atomic.Value(bool).init(false), .data = std.atomic.Value(bool).init(false), .queue = std.ArrayList(Record).init(allocator) };
+    pub fn new() Channel {
+        return Channel{ .locked = std.atomic.Value(bool).init(false), .data = std.atomic.Value(bool).init(false), .queue = std.ArrayList(Record).init(std.heap.page_allocator) };
     }
 
     /// Provides an option for sending records by checking if the state edit is
     /// locked (data manipulated by other source), then aquiring the lock and
     /// editing data, at the end releasing the lock and activating the state
     pub fn send(self: *Channel, record: Record) bool {
-        while (self.locked) {} // Wait to aquire state edit
+        while (self.locked.load(std.builtin.AtomicOrder.seq_cst)) {} // Wait to aquire state edit
 
-        self.locked = true;
-        self.queue.append(record);
-        self.locked = false;
-        self.has_data = true;
+        self.locked.store(true, std.builtin.AtomicOrder.seq_cst);
+        self.queue.append(record) catch return false;
+        std.debug.print("Size: {}!\n", .{self.queue.items.len});
+        self.locked.store(false, std.builtin.AtomicOrder.seq_cst);
+        self.data.store(true, std.builtin.AtomicOrder.seq_cst);
+
+        return true;
     }
 
     /// Provides an option for receiving records by checking if the state is
@@ -41,11 +44,11 @@ pub const Channel = struct {
         // Wait to active state and free lock
         while (!self.data.load(std.builtin.AtomicOrder.seq_cst) or self.locked.load(std.builtin.AtomicOrder.seq_cst)) {
             // TODO busy sleep
-        } // Wait to either activate state
+        }
 
-        // self.locked = true;
         self.locked.store(true, std.builtin.AtomicOrder.seq_cst);
         const rec = self.queue.orderedRemove(0);
+        std.debug.print("Size: {}!\n", .{self.queue.items.len});
         if (self.queue.items.len == 0) self.data.store(false, std.builtin.AtomicOrder.seq_cst);
         self.locked.store(false, std.builtin.AtomicOrder.seq_cst);
 

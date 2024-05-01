@@ -1,19 +1,20 @@
 const std = @import("std");
+const hash_transactions = @import("hash.zig").hash_transactions;
 const Hash = @import("hash.zig").Hash;
 const PohRecorder = @import("poh_recorder.zig").PohRecorder;
 const Record = @import("poh_recorder.zig").Record;
 const Slot = @import("poh_recorder.zig").Slot;
-const PohConfig = @import("poh_config.zig").PohConfig;
-const Poh = @import("poh.zig").Poh;
+const Poh = @import("poh.zig").PohMutex;
 const Channel = @import("channel.zig").Channel;
 
-/// Comment
+/// Service designed to keep the poh sequence running with the help of poh
+/// generator and poh recorder
 pub const PohService = struct {
     /// Working thread handle
     thread: ?std.Thread,
     /// Exit signal
     poh_exit: *std.atomic.Value(bool),
-    /// Poh generator reference
+    /// Guarded Poh generator reference
     poh: *Poh,
     /// Number of hashes per batch
     hashes_per_batch: u64,
@@ -35,6 +36,11 @@ pub const PohService = struct {
     pub fn start(self: *PohService) void {
         const tuple = .{self};
         self.thread = std.Thread.spawn(.{}, tick_producer, tuple) catch null;
+    }
+
+    /// Serves for joining the PohService thread, syncing point.
+    pub fn join(self: *PohService) void {
+        self.thread.?.join();
     }
 
     /// Responsible to start and keep the hashing process running in case of
@@ -114,7 +120,7 @@ pub const TransactionRecorder = struct {
     }
 
     /// Sends a record, newly created with provided transactions and bank slot to the PohService for further processing.
-    pub fn record_transaction(self: *TransactionRecorder, bank_slot: Slot, transactions: std.ArrayList(u64)) void {
-        self.record_sender.send(Record.new(Hash.new(transactions), transactions, bank_slot));
+    pub fn record_transaction(self: *TransactionRecorder, bank_slot: Slot, transactions: std.ArrayList(u64)) bool {
+        return self.record_sender.send(Record.new(hash_transactions(transactions), transactions, bank_slot));
     }
 };

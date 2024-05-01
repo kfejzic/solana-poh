@@ -130,3 +130,53 @@ pub const Poh = struct {
         return PohEntry{ .num_hashes = num_hashes, .hash = self.hash };
     }
 };
+
+/// Data structure designed to protect poh generator and ensure proper
+/// synchronization. Acting like Arc from Rust.
+pub const PohMutex = struct {
+    /// Mutex acting like the lock for the poh
+    lock: std.Thread.Mutex,
+    /// Poh generator that's protected
+    poh: Poh,
+
+    /// Constructs a new Poh object with provided start hash. Optionally taking
+    /// hashes per tick and tick number, if hashes per tick are not provided low
+    /// power mode is used. In case of tick number being left out, zero is used
+    /// (clear/new state).
+    pub fn new(hash_value: Hash, hashes_per_tick: ?u64, tick_number: ?u64) PohMutex {
+        return PohMutex{ .poh = Poh.new(hash_value, hashes_per_tick, tick_number), .lock = .{} };
+    }
+
+    /// Returns the ideal time from target ns per tick.
+    pub fn target_poh_time(self: *PohMutex, target_ns_per_tick: u64) i128 {
+        self.lock.lock();
+        defer self.lock.unlock();
+        return self.poh.target_poh_time(target_ns_per_tick);
+    }
+
+    /// This function performs a looping hash on it's 'hash' value, creating a
+    /// verifiable sequence, as well as updating the inner fields to reflect the
+    /// current Pog state. Returning an indicator if the caller needs to tick().
+    pub fn hash_sha256(self: *PohMutex, max_num_hashes: u64) bool {
+        self.lock.lock();
+        defer self.lock.unlock();
+        return self.poh.hash_sha256(max_num_hashes);
+    }
+
+    /// This function records an event by taking a piece of data(event) 'mixin', and
+    /// incorporating it into the ongoiong PoH sequence/chain, This ensures that
+    /// every event is linked to the history of all previous entries.
+    pub fn record(self: *PohMutex, mixin: Hash) ?PohEntry {
+        self.lock.lock();
+        defer self.lock.unlock();
+        return self.poh.record(mixin);
+    }
+
+    /// This function generates a new PohEntry that represents a tick in the poh
+    /// sequence, when no external data are incorporated, used for timekeeping.
+    pub fn tick(self: *PohMutex) ?PohEntry {
+        self.lock.lock();
+        defer self.lock.unlock();
+        return self.poh.tick();
+    }
+};
