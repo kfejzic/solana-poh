@@ -125,6 +125,7 @@ pub const Poh = struct {
         const num_hashes = self.num_hashes;
         // Reset remaining_hashes to the initial value for a new tick flow.
         self.remaining_hashes = self.hashes_per_tick;
+        self.num_hashes = 0;
         self.tick_number += 1;
 
         return PohEntry{ .num_hashes = num_hashes, .hash = self.hash };
