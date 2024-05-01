@@ -53,6 +53,15 @@ pub const Poh = struct {
         return Poh{ .hash = hash_value, .num_hashes = 0, .hashes_per_tick = hashes_pt, .remaining_hashes = hashes_pt, .tick_number = tick_number orelse 0, .slot_start_time = std.time.nanoTimestamp() };
     }
 
+    /// Returns the ideal time from target ns per tick.
+    pub fn target_poh_time(self: *Poh, target_ns_per_tick: u64) i128 {
+        if (self.hashes_per_tick < 1) std.debug.panic("[Poh::target_poh_time] Panic! hashes_per_tick required to be > 1", .{});
+
+        const offset_tick_ns = target_ns_per_tick * self.tick_number;
+        const offset_ns = target_ns_per_tick * self.num_hashes / self.hashes_per_tick;
+        return self.slot_start_time + offset_ns + offset_tick_ns;
+    }
+
     /// This function performs a looping hash on it's 'hash' value, creating a
     /// verifiable sequence, as well as updating the inner fields to reflect the
     /// current Pog state. Returning an indicator if the caller needs to tick().
